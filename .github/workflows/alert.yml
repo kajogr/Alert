@@ -3,7 +3,7 @@ name: Run Crypto Alerts
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'  # Κάθε 1 ώρα
+    - cron: '0 * * * *'  # Τρέχει κάθε 1 ώρα
 
 jobs:
   run:
