@@ -130,8 +130,6 @@ def main():
         if change_pct >= 100:
             alert.append(f"+{change_pct:.2f}% από το entry ➜ Σήμα ΟΛΙΚΗΣ ΠΩΛΗΣΗΣ")
             recommendation = "Προτείνεται ΟΛΙΚΗ ΠΩΛΗΣΗ"
-            # ➜ Θέλεις; Μπορούμε εδώ να μηδενίσουμε το entry αν θέλεις:
-            # entry_prices[symbol] = last
         elif change_pct >= 5:
             alert.append(f"+{change_pct:.2f}% από το entry ➜ Σήμα ΜΕΡΙΚΗΣ ΠΩΛΗΣΗΣ")
             recommendation = "Προτείνεται ΜΕΡΙΚΗ ΠΩΛΗΣΗ"
