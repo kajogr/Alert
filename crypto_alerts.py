@@ -4,7 +4,6 @@ from datetime import datetime
 import os
 from decimal import Decimal, getcontext, ROUND_HALF_UP
 
-# Μέγιστη ακρίβεια
 getcontext().prec = 18
 
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
@@ -19,13 +18,13 @@ coins = {
     "SAGA": "saga"
 }
 
-# Σταθερές Entry prices (Decimal)
+# ✔️ ΝΕΟ entry για PEPE
 entry_prices = {
     "SOL": Decimal("150.00"),
     "IOTX": Decimal("0.021"),
     "SUI": Decimal("2.92"),
     "ETH": Decimal("2550.00"),
-    "PEPE": Decimal("0.000000970"),
+    "PEPE": Decimal("0.0000009701"),
     "SAGA": Decimal("0.21")
 }
 
@@ -79,7 +78,6 @@ def main():
         last = prices[-1]
         entry = entry_prices[symbol]
 
-        # Ακριβές change με στρογγυλοποίηση
         change_pct = ((last - entry) / entry * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         rsi = calc_rsi(prices)
