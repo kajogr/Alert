@@ -6,17 +6,24 @@ import os
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-symbols = ["SOLUSDC", "IOTXUSDC", "SUIUSDC", "ETHUSDC", "PEPEUSDC", "SAGAUSDC"]
+# CoinGecko ids (όχι symbols!)
+coins = {
+    "SOL": "solana",
+    "IOTX": "iotex",
+    "SUI": "sui",
+    "ETH": "ethereum",
+    "PEPE": "pepe",
+    "SAGA": "saga"
+}
 
-def get_klines(symbol, interval="1h", limit=100):
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": interval, "limit": limit}
+def get_prices(coin_id, days=30):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {"vs_currency": "usd", "days": days}
     res = requests.get(url, params=params).json()
-    if isinstance(res, dict) and 'code' in res:
-        print(f"⚠️ API ERROR for {symbol}: {res}")
-        return []
-    closes = [float(k[4]) for k in res]
-    return closes
+    prices = [p[1] for p in res.get("prices", [])]
+    if not prices:
+        print(f"⚠️ API ERROR for {coin_id}: {res}")
+    return prices
 
 def calc_rsi(prices, period=14):
     delta = pd.Series(prices).diff()
@@ -28,7 +35,7 @@ def calc_rsi(prices, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1]
 
-def calc_ma(prices, period=50):
+def calc_ma(prices, period=20):
     ma = pd.Series(prices).rolling(window=period).mean()
     return ma.iloc[-1]
 
@@ -53,15 +60,15 @@ def send_push(message):
 
 def main():
     sent = False
-    for symbol in symbols:
-        prices = get_klines(symbol)
+    for symbol, coin_id in coins.items():
+        prices = get_prices(coin_id)
         if not prices:
             print(f"⏭️ No data for {symbol}, skipping...")
             continue
 
         last = prices[-1]
         rsi = calc_rsi(prices)
-        ma50 = calc_ma(prices)
+        ma = calc_ma(prices)
         macd, signal = calc_macd(prices)
 
         alert = []
@@ -75,17 +82,17 @@ def main():
         elif macd < signal:
             alert.append("MACD bearish crossover")
 
-        if last > ma50:
-            alert.append("Τιμή πάνω από MA50 (breakout)")
-        elif last < ma50:
-            alert.append("Τιμή κάτω από MA50 (breakdown)")
+        if last > ma:
+            alert.append("Τιμή πάνω από MA20 (breakout)")
+        elif last < ma:
+            alert.append("Τιμή κάτω από MA20 (breakdown)")
 
-        msg = f"{symbol}\nΤιμή: {last:.4f}\n" + "\n".join(alert if alert else ["🚨 Test Alert!"])
+        msg = f"{symbol} (${last:.4f})\n" + "\n".join(alert if alert else ["🚨 No strong signal"])
         send_push(msg)
         sent = True
 
     if not sent:
-        send_push("🚨 TEST ALERT: No valid symbols but push works!")
+        send_push("🚨 TEST ALERT: No valid data but push works!")
 
 if __name__ == "__main__":
     print(f"🔔 Crypto Alerts @ {datetime.now()}")
