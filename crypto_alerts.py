@@ -12,6 +12,9 @@ def get_klines(symbol, interval="1h", limit=100):
     url = "https://api.binance.com/api/v3/klines"
     params = {"symbol": symbol, "interval": interval, "limit": limit}
     res = requests.get(url, params=params).json()
+    if isinstance(res, dict) and 'code' in res:
+        print(f"⚠️ API ERROR for {symbol}: {res}")
+        return []
     closes = [float(k[4]) for k in res]
     return closes
 
@@ -50,6 +53,10 @@ def send_push(message):
 def main():
     for symbol in symbols:
         prices = get_klines(symbol)
+        if not prices:
+            print(f"⏭️ No data for {symbol}, skipping...")
+            continue
+
         last = prices[-1]
         rsi = calc_rsi(prices)
         ma50 = calc_ma(prices)
