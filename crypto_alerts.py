@@ -2,36 +2,40 @@ import requests
 import pandas as pd
 from datetime import datetime
 import os
+from decimal import Decimal, getcontext
 
-# 🔐 Pushover secrets από GitHub Secrets
+# 👉 Ακρίβεια υπολογισμών
+getcontext().prec = 15
+
+# Pushover secrets
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-# ✅ ΣΩΣΤΑ CoinGecko IDs
+# Coins
 coins = {
     "SOL": "solana",
     "IOTX": "iotex",
     "SUI": "sui",
     "ETH": "ethereum",
     "PEPE": "pepe",
-    "SAGA": "saga-2"  # ⚠️ Αν δεν δουλεύει, ψάξε ακριβές slug
+    "SAGA": "saga"
 }
 
-# Entry prices ΣΤΑΘΕΡΑ
+# Entry prices (με Decimal για ακρίβεια)
 entry_prices = {
-    "SOL": 150.00,
-    "IOTX": 0.021,
-    "SUI": 2.92,
-    "ETH": 2550.00,
-    "PEPE": 0.00000097,
-    "SAGA": 0.21
+    "SOL": Decimal("150.00"),
+    "IOTX": Decimal("0.021"),
+    "SUI": Decimal("2.92"),
+    "ETH": Decimal("2550.00"),
+    "PEPE": Decimal("0.000000970"),
+    "SAGA": Decimal("0.21")
 }
 
 def get_prices(coin_id, days=30):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": days}
     res = requests.get(url, params=params).json()
-    prices = [p[1] for p in res.get("prices", [])]
+    prices = [Decimal(str(p[1])) for p in res.get("prices", [])]
     return prices
 
 def calc_rsi(prices, period=14):
@@ -72,12 +76,11 @@ def main():
     for symbol, coin_id in coins.items():
         prices = get_prices(coin_id)
         if not prices:
-            print(f"⚠️ No prices for {symbol}")
             continue
 
         last = prices[-1]
         entry = entry_prices.get(symbol, last)
-        change_pct = ((last - entry) / entry) * 100 if entry > 0 else 0
+        change_pct = ((last - entry) / entry * Decimal("100")) if entry > 0 else Decimal("0")
 
         rsi = calc_rsi(prices)
         ma = calc_ma(prices)
@@ -117,13 +120,9 @@ def main():
             alert.append(f"Τιμή {change_pct:.2f}% ➜ ΣΤΟΠ ΖΗΜΙΑΣ")
             recommendation = "ΣΤΟΠ ΖΗΜΙΑΣ"
 
-        # ➜ Ειδικό formatting για PEPE
-        if symbol == "PEPE":
+        if last < 0.1:
             price_str = f"{last:.9f}"
             entry_str = f"{entry:.9f}"
-        elif last < 0.1:
-            price_str = f"{last:.8f}"
-            entry_str = f"{entry:.8f}"
         else:
             price_str = f"{last:.4f}"
             entry_str = f"{entry:.4f}"
