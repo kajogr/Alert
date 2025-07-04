@@ -3,7 +3,11 @@ name: Run Crypto Alerts
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'  # Κάθε 1 ώρα
+    - cron: '*/5 * * * *'  # Κάθε 5 λεπτά
+
+concurrency:
+  group: crypto-alerts
+  cancel-in-progress: true
 
 jobs:
   run:
