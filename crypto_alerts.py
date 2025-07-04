@@ -6,7 +6,7 @@ import os
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-symbols = ["SOLUSDT", "IOTXUSDT", "SUIUSDT", "ETHUSDT", "PEPEUSDT", "SAGAUSDT", "USDCUSDT"]
+symbols = ["SOLUSDC", "IOTXUSDC", "SUIUSDC", "ETHUSDC", "PEPEUSDC", "SAGAUSDC"]
 
 def get_klines(symbol, interval="1h", limit=100):
     url = "https://api.binance.com/api/v3/klines"
@@ -41,7 +41,7 @@ def calc_macd(prices):
     return macd_line.iloc[-1], signal.iloc[-1]
 
 def send_push(message):
-    requests.post(
+    response = requests.post(
         "https://api.pushover.net/1/messages.json",
         data={
             "token": PUSHOVER_TOKEN,
@@ -49,8 +49,10 @@ def send_push(message):
             "message": message
         }
     )
+    print(f"🔔 Push Response: {response.text}")
 
 def main():
+    sent = False
     for symbol in symbols:
         prices = get_klines(symbol)
         if not prices:
@@ -80,6 +82,10 @@ def main():
 
         msg = f"{symbol}\nΤιμή: {last:.4f}\n" + "\n".join(alert if alert else ["🚨 Test Alert!"])
         send_push(msg)
+        sent = True
+
+    if not sent:
+        send_push("🚨 TEST ALERT: No valid symbols but push works!")
 
 if __name__ == "__main__":
     print(f"🔔 Crypto Alerts @ {datetime.now()}")
