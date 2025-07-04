@@ -3,11 +3,11 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# Pushover secrets από GitHub Actions
+# Pushover secrets
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-# CoinGecko coins: id και όνομα
+# CoinGecko ids
 coins = {
     "SOL": "solana",
     "IOTX": "iotex",
@@ -17,7 +17,7 @@ coins = {
     "SAGA": "saga"
 }
 
-# Παίρνει daily τιμές από CoinGecko
+# Παίρνει ιστορικά daily prices
 def get_prices(coin_id, days=30):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": days}
@@ -27,7 +27,7 @@ def get_prices(coin_id, days=30):
         print(f"⚠️ API ERROR for {coin_id}: {res}")
     return prices
 
-# Υπολογισμός RSI
+# RSI
 def calc_rsi(prices, period=14):
     delta = pd.Series(prices).diff()
     gain = delta.where(delta > 0, 0)
@@ -38,12 +38,12 @@ def calc_rsi(prices, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1]
 
-# Υπολογισμός MA
+# MA20
 def calc_ma(prices, period=20):
     ma = pd.Series(prices).rolling(window=period).mean()
     return ma.iloc[-1]
 
-# Υπολογισμός MACD
+# MACD
 def calc_macd(prices):
     prices = pd.Series(prices)
     ema12 = prices.ewm(span=12, adjust=False).mean()
@@ -52,7 +52,7 @@ def calc_macd(prices):
     signal = macd_line.ewm(span=9, adjust=False).mean()
     return macd_line.iloc[-1], signal.iloc[-1]
 
-# Στέλνει push στο Pushover
+# Στέλνει push
 def send_push(message):
     response = requests.post(
         "https://api.pushover.net/1/messages.json",
@@ -64,10 +64,12 @@ def send_push(message):
     )
     print(f"🔔 Push Response: {response.status_code} | {response.text}")
 
-# Κύρια λογική
+# ΟΛΗ η λογική
 def main():
     print(f"🔔 Crypto Alerts @ {datetime.now()}")
     sent = False
+
+    entry_prices = {}
 
     for symbol, coin_id in coins.items():
         print(f"\n🔎 Checking {symbol} ({coin_id})")
@@ -79,52 +81,10 @@ def main():
             continue
 
         last = prices[-1]
-        print(f"Last price: {last}")
 
-        rsi = calc_rsi(prices)
-        ma = calc_ma(prices)
-        macd, signal = calc_macd(prices)
+        # Αν δεν υπάρχει entry price ➜ θέτουμε το τρέχον
+        if symbol not in entry_prices:
+            entry_prices[symbol] = last
 
-        print(f"RSI: {rsi:.2f} | MA: {ma:.4f} | MACD: {macd:.4f} | Signal: {signal:.4f}")
-
-        alert = []
-        recommendation = "Προτείνεται ΑΝΑΜΟΝΗ"
-
-        if rsi < 30:
-            alert.append("RSI κάτω από 30 (υπερπώληση)")
-            recommendation = "Προτείνεται ΑΓΟΡΑ"
-        elif rsi > 70:
-            alert.append("RSI πάνω από 70 (υπεραγορά)")
-            recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
-
-        if macd > signal:
-            alert.append("MACD bullish crossover")
-            recommendation = "Προτείνεται ΑΓΟΡΑ"
-        elif macd < signal:
-            alert.append("MACD bearish crossover")
-            recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
-
-        if last > ma:
-            alert.append("Τιμή πάνω από MA20 (breakout)")
-            recommendation = "Προτείνεται ΑΓΟΡΑ"
-        elif last < ma:
-            alert.append("Τιμή κάτω από MA20 (breakdown)")
-            recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
-
-        if last < 0.1:
-            price_str = f"{last:.8f}"
-        else:
-            price_str = f"{last:.4f}"
-
-        msg = f"{symbol} (${price_str})\n" + "\n".join(alert if alert else ["🚨 No strong signal"]) + f"\n{recommendation}"
-        print(f"📤 Sending push: {msg}")
-
-        send_push(msg)
-        sent = True
-
-    if not sent:
-        print("⚠️ No valid data — sending fallback TEST push...")
-        send_push("🚨 TEST ALERT: No valid data but push works!")
-
-if __name__ == "__main__":
-    main()
+        entry = entry_prices[symbol]
+        change_pct = ((last - entry) / entry) *
