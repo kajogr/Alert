@@ -1,29 +1,38 @@
-name: alert
+name: Run Crypto Alerts
 
 on:
-  schedule:
-    - cron: '0 * * * *' # Τρέχει κάθε 1 ώρα
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'  # Κάθε 1 ώρα
 
 jobs:
-  crypto_alerts:
+  run:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout Repo
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
-          pip install requests pandas
+          python -m pip install --upgrade pip
+          pip install pandas requests
 
-      - name: Run crypto alerts
+      - name: Run Crypto Alerts Script
         env:
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+        run: python crypto_alerts.py
+
+      - name: Commit entry_prices.json
         run: |
-          python crypto_alerts.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add entry_prices.json
+          git commit -m "Update entry prices" || echo "No changes to commit"
+          git push
