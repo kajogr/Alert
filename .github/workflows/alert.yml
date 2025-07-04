@@ -3,7 +3,7 @@ name: Run Crypto Alerts
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'  # Τρέχει κάθε 1 ώρα
+    - cron: '0 * * * *'  # Κάθε 1 ώρα
 
 jobs:
   run:
@@ -28,13 +28,3 @@ jobs:
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
           PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
         run: python crypto_alerts.py
-
-      - name: Commit entry_prices.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add entry_prices.json
-          git commit -m "Update entry prices" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
