@@ -2,13 +2,12 @@ import requests
 import pandas as pd
 from datetime import datetime
 import os
-import json
 
-# Pushover secrets από GitHub
+# Pushover secrets από GitHub Secrets
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-# CoinGecko ids για κάθε νόμισμα
+# Τα coins
 coins = {
     "SOL": "solana",
     "IOTX": "iotex",
@@ -18,17 +17,23 @@ coins = {
     "SAGA": "saga"
 }
 
-# Παίρνει daily prices 30 ημερών
+# Entry prices — ΣΤΑΘΕΡΑ μέσα στο script
+entry_prices = {
+    "SOL": 150.00,
+    "IOTX": 0.021,
+    "SUI": 2.92,
+    "ETH": 2550.00,
+    "PEPE": 0.00000097,
+    "SAGA": 0.21  # ✅ ΟΚ όπως το θες!
+}
+
 def get_prices(coin_id, days=30):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": days}
     res = requests.get(url, params=params).json()
     prices = [p[1] for p in res.get("prices", [])]
-    if not prices:
-        print(f"⚠️ API ERROR for {coin_id}: {res}")
     return prices
 
-# Υπολογισμός RSI
 def calc_rsi(prices, period=14):
     delta = pd.Series(prices).diff()
     gain = delta.where(delta > 0, 0)
@@ -39,12 +44,10 @@ def calc_rsi(prices, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1]
 
-# Υπολογισμός MA20
 def calc_ma(prices, period=20):
     ma = pd.Series(prices).rolling(window=period).mean()
     return ma.iloc[-1]
 
-# Υπολογισμός MACD
 def calc_macd(prices):
     prices = pd.Series(prices)
     ema12 = prices.ewm(span=12, adjust=False).mean()
@@ -53,9 +56,8 @@ def calc_macd(prices):
     signal = macd_line.ewm(span=9, adjust=False).mean()
     return macd_line.iloc[-1], signal.iloc[-1]
 
-# Στέλνει push στο Pushover
 def send_push(message):
-    response = requests.post(
+    requests.post(
         "https://api.pushover.net/1/messages.json",
         data={
             "token": PUSHOVER_TOKEN,
@@ -63,79 +65,56 @@ def send_push(message):
             "message": message
         }
     )
-    print(f"🔔 Push Response: {response.status_code} | {response.text}")
 
-# Κύρια λογική
 def main():
     print(f"🔔 Crypto Alerts @ {datetime.now()}")
-    sent = False
-
-    json_file = "entry_prices.json"
-
-    if os.path.exists(json_file):
-        with open(json_file, "r") as f:
-            entry_prices = json.load(f)
-    else:
-        entry_prices = {}
 
     for symbol, coin_id in coins.items():
-        print(f"\n🔎 Checking {symbol} ({coin_id})")
         prices = get_prices(coin_id)
-        print(f"Prices: last 5 → {prices[-5:]}")
-
         if not prices:
-            print(f"⏭️ No data for {symbol}, skipping...")
             continue
 
         last = prices[-1]
-
-        if symbol not in entry_prices:
-            entry_prices[symbol] = last
-
-        entry = entry_prices[symbol]
-        change_pct = ((last - entry) / entry) * 100
-
-        print(f"Last price: {last} | Entry: {entry} | Change: {change_pct:.2f}%")
+        entry = entry_prices.get(symbol, last)
+        change_pct = ((last - entry) / entry) * 100 if entry > 0 else 0
 
         rsi = calc_rsi(prices)
         ma = calc_ma(prices)
         macd, signal = calc_macd(prices)
 
-        print(f"RSI: {rsi:.2f} | MA: {ma:.4f} | MACD: {macd:.4f} | Signal: {signal:.4f}")
-
         alert = []
-        recommendation = "Προτείνεται ΑΝΑΜΟΝΗ"
+        recommendation = "ΑΝΑΜΟΝΗ"
 
         if rsi < 30:
-            alert.append("RSI κάτω από 30 (υπερπώληση)")
-            recommendation = "Προτείνεται ΑΓΟΡΑ"
+            alert.append("RSI κάτω από 30 ➜ Υπερπώληση")
+            recommendation = "ΑΓΟΡΑ"
         elif rsi > 70:
-            alert.append("RSI πάνω από 70 (υπεραγορά)")
-            recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
+            alert.append("RSI πάνω από 70 ➜ Υπεραγορά")
+            recommendation = "ΟΧΙ ΑΓΟΡΑ"
 
         if macd > signal:
             alert.append("MACD bullish crossover")
-            recommendation = "Προτείνεται ΑΓΟΡΑ"
+            recommendation = "ΑΓΟΡΑ"
         elif macd < signal:
             alert.append("MACD bearish crossover")
-            recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
+            recommendation = "ΟΧΙ ΑΓΟΡΑ"
 
         if last > ma:
-            alert.append("Τιμή πάνω από MA20 (breakout)")
-            recommendation = "Προτείνεται ΑΓΟΡΑ"
+            alert.append("Τιμή πάνω από MA20 ➜ Breakout")
+            recommendation = "ΑΓΟΡΑ"
         elif last < ma:
-            alert.append("Τιμή κάτω από MA20 (breakdown)")
-            recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
+            alert.append("Τιμή κάτω από MA20 ➜ Breakdown")
+            recommendation = "ΟΧΙ ΑΓΟΡΑ"
 
         if change_pct >= 100:
-            alert.append(f"+{change_pct:.2f}% από το entry ➜ Σήμα ΟΛΙΚΗΣ ΠΩΛΗΣΗΣ")
-            recommendation = "Προτείνεται ΟΛΙΚΗ ΠΩΛΗΣΗ"
+            alert.append(f"Τιμή +{change_pct:.2f}% ➜ ΟΛΙΚΗ ΠΩΛΗΣΗ")
+            recommendation = "ΠΩΛΗΣΗ"
         elif change_pct >= 5:
-            alert.append(f"+{change_pct:.2f}% από το entry ➜ Σήμα ΜΕΡΙΚΗΣ ΠΩΛΗΣΗΣ")
-            recommendation = "Προτείνεται ΜΕΡΙΚΗ ΠΩΛΗΣΗ"
+            alert.append(f"Τιμή +{change_pct:.2f}% ➜ ΜΕΡΙΚΗ ΠΩΛΗΣΗ")
+            recommendation = "ΜΕΡΙΚΗ ΠΩΛΗΣΗ"
         elif change_pct <= -3:
-            alert.append(f"{change_pct:.2f}% από το entry ➜ Σήμα ΣΤΟΠ ΖΗΜΙΑΣ")
-            recommendation = "Προτείνεται ΣΤΟΠ ΖΗΜΙΑΣ"
+            alert.append(f"Τιμή {change_pct:.2f}% ➜ ΣΤΟΠ ΖΗΜΙΑΣ")
+            recommendation = "ΣΤΟΠ ΖΗΜΙΑΣ"
 
         if last < 0.1:
             price_str = f"{last:.8f}"
@@ -148,21 +127,12 @@ def main():
             f"{symbol} (${price_str})\n"
             f"Entry: ${entry_str}\n"
             f"Change: {change_pct:.2f}%\n"
-            + "\n".join(alert if alert else ["🚨 No strong signal"])
-            + f"\n{recommendation}"
+            + "\n".join(alert)
+            + f"\nΠροτείνεται {recommendation}"
         )
 
-        print(f"📤 Sending push: {msg}")
-
+        print(msg)
         send_push(msg)
-        sent = True
-
-    with open(json_file, "w") as f:
-        json.dump(entry_prices, f, indent=4)
-
-    if not sent:
-        print("⚠️ No valid data — sending fallback TEST push...")
-        send_push("🚨 TEST ALERT: No valid data but push works!")
 
 if __name__ == "__main__":
     main()
