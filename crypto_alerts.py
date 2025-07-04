@@ -24,7 +24,7 @@ entry_prices = {
     "IOTX": Decimal("0.021"),
     "SUI": Decimal("2.92"),
     "ETH": Decimal("2550.00"),
-    "PEPE": Decimal("0.0000009701"),
+    "PEPE": Decimal("0.000009701"),
     "SAGA": Decimal("0.21")
 }
 
@@ -118,9 +118,13 @@ def main():
             alert.append(f"Τιμή {change_pct}% ➜ ΣΤΟΠ ΖΗΜΙΑΣ")
             recommendation = "ΣΤΟΠ ΖΗΜΙΑΣ"
 
-        if last < Decimal("0.1"):
+        # ✔️ Διόρθωση display για PEPE
+        if symbol == "PEPE":
             price_str = f"{last:.9f}"
             entry_str = f"{entry:.9f}"
+        elif last < Decimal("0.1"):
+            price_str = f"{last:.8f}"
+            entry_str = f"{entry:.8f}"
         else:
             price_str = f"{last:.4f}"
             entry_str = f"{entry:.4f}"
