@@ -2,16 +2,14 @@ import requests
 import pandas as pd
 from datetime import datetime
 import os
-from decimal import Decimal, getcontext
+from decimal import Decimal, getcontext, ROUND_HALF_UP
 
-# 👉 Ακρίβεια υπολογισμών
-getcontext().prec = 15
+# Μέγιστη ακρίβεια
+getcontext().prec = 18
 
-# Pushover secrets
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-# Coins
 coins = {
     "SOL": "solana",
     "IOTX": "iotex",
@@ -21,7 +19,7 @@ coins = {
     "SAGA": "saga"
 }
 
-# Entry prices (με Decimal για ακρίβεια)
+# Σταθερές Entry prices (Decimal)
 entry_prices = {
     "SOL": Decimal("150.00"),
     "IOTX": Decimal("0.021"),
@@ -79,8 +77,10 @@ def main():
             continue
 
         last = prices[-1]
-        entry = entry_prices.get(symbol, last)
-        change_pct = ((last - entry) / entry * Decimal("100")) if entry > 0 else Decimal("0")
+        entry = entry_prices[symbol]
+
+        # Ακριβές change με στρογγυλοποίηση
+        change_pct = ((last - entry) / entry * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         rsi = calc_rsi(prices)
         ma = calc_ma(prices)
@@ -111,16 +111,16 @@ def main():
             recommendation = "ΟΧΙ ΑΓΟΡΑ"
 
         if change_pct >= 100:
-            alert.append(f"Τιμή +{change_pct:.2f}% ➜ ΟΛΙΚΗ ΠΩΛΗΣΗ")
+            alert.append(f"Τιμή +{change_pct}% ➜ ΟΛΙΚΗ ΠΩΛΗΣΗ")
             recommendation = "ΠΩΛΗΣΗ"
         elif change_pct >= 5:
-            alert.append(f"Τιμή +{change_pct:.2f}% ➜ ΜΕΡΙΚΗ ΠΩΛΗΣΗ")
+            alert.append(f"Τιμή +{change_pct}% ➜ ΜΕΡΙΚΗ ΠΩΛΗΣΗ")
             recommendation = "ΜΕΡΙΚΗ ΠΩΛΗΣΗ"
         elif change_pct <= -3:
-            alert.append(f"Τιμή {change_pct:.2f}% ➜ ΣΤΟΠ ΖΗΜΙΑΣ")
+            alert.append(f"Τιμή {change_pct}% ➜ ΣΤΟΠ ΖΗΜΙΑΣ")
             recommendation = "ΣΤΟΠ ΖΗΜΙΑΣ"
 
-        if last < 0.1:
+        if last < Decimal("0.1"):
             price_str = f"{last:.9f}"
             entry_str = f"{entry:.9f}"
         else:
@@ -130,7 +130,7 @@ def main():
         msg = (
             f"{symbol} (${price_str})\n"
             f"Entry: ${entry_str}\n"
-            f"Change: {change_pct:.2f}%\n"
+            f"Change: {change_pct}%\n"
             + "\n".join(alert)
             + f"\nΠροτείνεται {recommendation}"
         )
