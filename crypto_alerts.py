@@ -2,12 +2,13 @@ import requests
 import pandas as pd
 from datetime import datetime
 import os
+import json
 
-# Pushover secrets από GitHub
+# Pushover secrets
 PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 
-# Τα CoinGecko ids για τα κέρματα σου
+# CoinGecko ids
 coins = {
     "SOL": "solana",
     "IOTX": "iotex",
@@ -17,7 +18,7 @@ coins = {
     "SAGA": "saga"
 }
 
-# Παίρνει daily prices (30 μέρες) από CoinGecko
+# Παίρνει daily prices
 def get_prices(coin_id, days=30):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": days}
@@ -52,7 +53,7 @@ def calc_macd(prices):
     signal = macd_line.ewm(span=9, adjust=False).mean()
     return macd_line.iloc[-1], signal.iloc[-1]
 
-# Στέλνει push στο Pushover
+# Στέλνει push
 def send_push(message):
     response = requests.post(
         "https://api.pushover.net/1/messages.json",
@@ -69,8 +70,15 @@ def main():
     print(f"🔔 Crypto Alerts @ {datetime.now()}")
     sent = False
 
-    # Entry prices (ξεκινάνε από την τρέχουσα τιμή)
-    entry_prices = {}
+    # JSON αρχείο
+    json_file = "entry_prices.json"
+
+    # Φορτώνει ή φτιάχνει το entry_prices dict
+    if os.path.exists(json_file):
+        with open(json_file, "r") as f:
+            entry_prices = json.load(f)
+    else:
+        entry_prices = {}
 
     for symbol, coin_id in coins.items():
         print(f"\n🔎 Checking {symbol} ({coin_id})")
@@ -83,7 +91,7 @@ def main():
 
         last = prices[-1]
 
-        # Αν δεν έχουμε entry ➜ παίρνουμε το τρέχον
+        # Αν δεν υπάρχει entry ➜ αποθηκεύει νέο
         if symbol not in entry_prices:
             entry_prices[symbol] = last
 
@@ -122,7 +130,7 @@ def main():
             alert.append("Τιμή κάτω από MA20 (breakdown)")
             recommendation = "Προτείνεται ΟΧΙ ΑΓΟΡΑ"
 
-        # Ολική πώληση αν διπλασιαστεί
+        # Sell signals
         if change_pct >= 100:
             alert.append(f"+{change_pct:.2f}% από το entry ➜ Σήμα ΟΛΙΚΗΣ ΠΩΛΗΣΗΣ")
             recommendation = "Προτείνεται ΟΛΙΚΗ ΠΩΛΗΣΗ"
@@ -143,6 +151,10 @@ def main():
 
         send_push(msg)
         sent = True
+
+    # Αποθηκεύει στο JSON
+    with open(json_file, "w") as f:
+        json.dump(entry_prices, f, indent=4)
 
     if not sent:
         print("⚠️ No valid data — sending fallback TEST push...")
